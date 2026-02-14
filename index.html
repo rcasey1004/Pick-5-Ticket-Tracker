@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>F5 Hits Tracker 2.0</title>
+    <style>
+        :root { --neon: #00ffcc; --gold: #ffcc00; --loss: #ff4444; }
+        body { font-family: sans-serif; background: #050505; color: white; padding: 15px; margin: 0; }
+        .dashboard { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px; }
+        .stat-card { background: #111; padding: 15px; border-radius: 15px; border: 1px solid #222; text-align: center; }
+        .stat-val { display: block; font-size: 22px; font-weight: 900; color: var(--neon); }
+        .stat-label { font-size: 10px; color: #666; text-transform: uppercase; }
+
+        .main-card { background: #111; padding: 20px; border-radius: 20px; border: 1px solid #222; }
+        input, select { background: #1a1a1a; border: 1px solid #333; color: white; padding: 12px; border-radius: 10px; width: 100%; box-sizing: border-box; margin-bottom: 10px; }
+        
+        button { background: var(--neon); color: black; border: none; padding: 15px; border-radius: 12px; font-weight: 800; width: 100%; cursor: pointer; margin-bottom: 10px; }
+        .win-btn { background: var(--gold); }
+
+        .ticket-row { background: #161616; padding: 12px; border-radius: 10px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; border-left: 4px solid #333; }
+        .match-high { border-left-color: var(--neon); background: #00221a; }
+        .delete { color: #444; font-size: 18px; margin-left: 10px; }
+    </style>
+</head>
+<body>
+
+<div class="dashboard">
+    <div class="stat-card">
+        <span class="stat-val" id="totalSpend">$0</span>
+        <span class="stat-label">Total Spent</span>
+    </div>
+    <div class="stat-card">
+        <span class="stat-val" id="totalWins" style="color:var(--gold)">$0</span>
+        <span class="stat-label">Total Won</span>
+    </div>
+</div>
+
+<div class="main-card">
+    <h2 style="margin-top:0; font-size:18px; color:var(--neon)">HITS TRACKER 2.0</h2>
+    
+    <p style="font-size:11px; color:#666;">WINNING NUMBERS (TONIGHT)</p>
+    <input type="text" id="winInput" placeholder="Ex: 12 16 21 29 39" oninput="checkTickets()">
+
+    <p style="font-size:11px; color:#666;">LOG NEW TICKET</p>
+    <input type="text" id="ticketInput" placeholder="Ex: 05 12 21 30 38">
+    <input type="number" id="costInput" placeholder="Cost (usually $1)" value="1">
+    <button onclick="addTicket()">SAVE TO PERSISTENT MEMORY</button>
+</div>
+
+<div id="ticketList" style="margin-top:20px;"></div>
+
+<script>
+    let tickets = JSON.parse(localStorage.getItem('f5_vault') || "[]");
+    let wallet = JSON.parse(localStorage.getItem('f5_wallet') || '{"spend":0, "wins":0}');
+
+    function updateDash() {
+        document.getElementById('totalSpend').innerText = `$${wallet.spend}`;
+        document.getElementById('totalWins').innerText = `$${wallet.wins}`;
+        localStorage.setItem('f5_wallet', JSON.stringify(wallet));
+    }
+
+    function addTicket() {
+        const val = document.getElementById('ticketInput').value.trim();
+        const cost = parseInt(document.getElementById('costInput').value) || 0;
+        if(!val) return;
+
+        tickets.push({nums: val, cost: cost, win: 0, date: new Date().toLocaleDateString()});
+        wallet.spend += cost;
+        
+        localStorage.setItem('f5_vault', JSON.stringify(tickets));
+        document.getElementById('ticketInput').value = '';
+        updateDash();
+        checkTickets();
+    }
+
+    function logWin(index) {
+        let amount = prompt("Enter prize amount won:");
+        if(amount !== null) {
+            wallet.wins += parseInt(amount);
+            tickets[index].win = parseInt(amount);
+            localStorage.setItem('f5_vault', JSON.stringify(tickets));
+            updateDash();
+            checkTickets();
+        }
+    }
+
+    function checkTickets() {
+        const winNums = document.getElementById('winInput').value.split(/\s+/).map(Number);
+        const list = document.getElementById('ticketList');
+        list.innerHTML = '';
+
+        tickets.forEach((t, i) => {
+            const myNums = t.nums.split(/\s+/).map(Number);
+            let matches = myNums.filter(n => winNums.includes(n) && winNums[0] !== 0).length;
+            
+            list.innerHTML += `
+                <div class="ticket-row ${matches >= 2 ? 'match-high' : ''}">
+                    <div>
+                        <div style="font-size:16px; font-weight:bold;">${t.nums}</div>
+                        <div style="font-size:10px; color:#555;">${t.date} | Matches: ${matches}</div>
+                    </div>
+                    <button class="win-btn" style="width:auto; padding:5px 10px; font-size:10px;" onclick="logWin(${i})">LOG WIN</button>
+                    <span class="delete" onclick="removeTicket(${i})">×</span>
+                </div>`;
+        });
+    }
+
+    function removeTicket(i) {
+        if(confirm("Delete this record?")) {
+            tickets.splice(i, 1);
+            localStorage.setItem('f5_vault', JSON.stringify(tickets));
+            checkTickets();
+        }
+    }
+
+    window.onload = () => { updateDash(); checkTickets(); };
+</script>
+</body>
+</html>
