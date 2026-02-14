@@ -3,91 +3,98 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>F5 Tracker 2.1</title>
+    <title>F5 Tracker 2.2 Pro</title>
     <style>
         :root { --neon: #00ffcc; --gold: #ffcc00; --bg: #0a0a0a; }
-        body { font-family: sans-serif; background: var(--bg); color: white; padding: 15px; }
-        .card { background: #111; padding: 20px; border-radius: 20px; border: 1px solid #222; max-width: 450px; margin: auto; }
+        body { font-family: sans-serif; background: var(--bg); color: white; padding: 15px; margin: 0; }
+        .card { background: #111; padding: 20px; border-radius: 24px; border: 1px solid #222; max-width: 450px; margin: auto; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
         .stats { display: flex; gap: 10px; margin-bottom: 20px; }
-        .stat-box { flex: 1; background: #1a1a1a; padding: 15px; border-radius: 15px; text-align: center; border: 1px solid #333; }
-        input, select { background: #1a1a1a; border: 1px solid #333; color: white; padding: 14px; border-radius: 12px; width: 100%; box-sizing: border-box; margin-bottom: 12px; font-size: 16px; }
-        button { background: var(--neon); color: black; border: none; padding: 16px; border-radius: 14px; font-weight: 800; width: 100%; cursor: pointer; }
-        .ticket { background: #161616; padding: 15px; border-radius: 12px; margin-top: 10px; border-left: 4px solid #333; position: relative; }
-        .match-win { border-left-color: var(--neon); background: #00221a; }
-        .match-num { color: var(--neon); font-weight: bold; text-decoration: underline; }
-        .log-win-btn { background: var(--gold); padding: 5px 10px; border-radius: 5px; font-size: 10px; border: none; font-weight: bold; margin-top: 8px; cursor: pointer; }
+        .stat-box { flex: 1; background: #1a1a1a; padding: 15px; border-radius: 16px; text-align: center; border: 1px solid #333; }
+        .stat-label { display: block; font-size: 10px; color: #666; margin-bottom: 5px; }
+        input, select { background: #1a1a1a; border: 1px solid #333; color: white; padding: 14px; border-radius: 12px; width: 100%; box-sizing: border-box; margin-bottom: 12px; font-size: 16px; outline: none; }
+        input:focus { border-color: var(--neon); }
+        button { background: var(--neon); color: black; border: none; padding: 18px; border-radius: 16px; font-weight: 900; width: 100%; cursor: pointer; transition: 0.2s; }
+        button:active { transform: scale(0.98); }
+        .ticket { background: #161616; padding: 18px; border-radius: 16px; margin-top: 12px; border-left: 6px solid #333; position: relative; animation: slideIn 0.3s ease; }
+        @keyframes slideIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .match-win { border-left-color: var(--neon); background: linear-gradient(90deg, #00221a 0%, #161616 100%); }
+        .match-num { color: var(--neon); font-weight: 900; text-decoration: underline; }
+        .log-win-btn { background: var(--gold); padding: 8px 15px; border-radius: 8px; font-size: 11px; border: none; font-weight: bold; margin-top: 10px; cursor: pointer; width: 100%; }
+        .del-x { position: absolute; right: 15px; top: 15px; color: #444; font-size: 20px; cursor: pointer; }
     </style>
 </head>
 <body>
 
 <div class="card">
     <div class="stats">
-        <div class="stat-box"><small>SPENT</small><br><span id="spentDisplay" style="font-size:20px; font-weight:900;">$0</span></div>
-        <div class="stat-box"><small>WON</small><br><span id="wonDisplay" style="font-size:20px; font-weight:900; color:var(--gold);">$0</span></div>
+        <div class="stat-box"><span class="stat-label">TOTAL SPENT</span><span id="spentDisplay" style="font-size:22px; font-weight:900;">$0</span></div>
+        <div class="stat-box"><span class="stat-label">TOTAL WON</span><span id="wonDisplay" style="font-size:22px; font-weight:900; color:var(--gold);">$0</span></div>
     </div>
 
-    <input type="text" id="winDraw" placeholder="Tonight's Winning #s" oninput="render()">
-    <input type="text" id="newTicket" placeholder="Enter Your Numbers">
+    <input type="text" id="winDraw" placeholder="Winning #s (Ex: 12 16 21...)" oninput="render()">
+    <input type="text" id="newTicket" placeholder="Your Ticket #s">
     
     <select id="duration">
-        <option value="1">1 Day</option>
-        <option value="3">3 Days</option>
-        <option value="5">5 Days</option>
-        <option value="10">10 Days</option>
+        <option value="1">1 Day ($1)</option>
+        <option value="3">3 Days ($3)</option>
+        <option value="5">5 Days ($5)</option>
+        <option value="10">10 Days ($10)</option>
     </select>
     
-    <button onclick="saveTicket()">SAVE TO PERSISTENT MEMORY</button>
+    <button onclick="saveTicket()">SAVE TO VAULT</button>
 </div>
 
-<div id="list" style="max-width:450px; margin: 20px auto;"></div>
+<div id="list" style="max-width:450px; margin: 20px auto; padding-bottom: 50px;"></div>
 
 <script>
-    let vault = JSON.parse(localStorage.getItem('f5_v21_vault') || "[]");
-    let stats = JSON.parse(localStorage.getItem('f5_v21_stats') || '{"spent":0, "won":0}');
+    let vault = JSON.parse(localStorage.getItem('f5_v22_vault') || "[]");
+    let stats = JSON.parse(localStorage.getItem('f5_v22_stats') || '{"spent":0, "won":0}');
+
+    // CLEANER FUNCTION: Prevents the "NaN" bug
+    function cleanNumbers(str) {
+        return str.replace(/[^0-9\s]/g, ' ').split(/\s+/).filter(n => n !== "").map(Number);
+    }
 
     function saveTicket() {
-        const nums = document.getElementById('newTicket').value.trim();
+        const rawNums = document.getElementById('newTicket').value;
+        const cleanArr = cleanNumbers(rawNums);
         const days = parseInt(document.getElementById('duration').value);
-        if(!nums) return;
+        
+        if(cleanArr.length < 1) return;
 
-        vault.push({
-            nums: nums,
+        vault.unshift({ // Newest tickets at the top
+            nums: cleanArr,
             added: new Date().getTime(),
             days: days,
-            paid: days,
             payout: 0
         });
 
         stats.spent += days;
-        localStorage.setItem('f5_v21_vault', JSON.stringify(vault));
-        localStorage.setItem('f5_v21_stats', JSON.stringify(stats));
-        
-        document.getElementById('newTicket').value = ''; // Clear input!
+        saveAll();
+        document.getElementById('newTicket').value = ''; 
         render();
     }
 
     function render() {
-        const winning = document.getElementById('winDraw').value.split(/\s+/).map(Number);
+        const winning = cleanNumbers(document.getElementById('winDraw').value);
         const listDiv = document.getElementById('list');
         listDiv.innerHTML = '';
 
         vault.forEach((t, i) => {
-            const myNums = t.nums.split(/\s+/).map(Number);
             let matchCount = 0;
-            
-            // Build the number display with highlighting
-            let numHTML = myNums.map(n => {
-                const isMatch = winning.includes(n) && winning[0] !== 0;
+            let numHTML = t.nums.map(n => {
+                const isMatch = winning.includes(n);
                 if(isMatch) matchCount++;
-                return `<span class="${isMatch ? 'match-num' : ''}">${n < 10 ? '0'+n : n}</span>`;
+                const formatted = n < 10 ? '0'+n : n;
+                return `<span class="${isMatch ? 'match-num' : ''}">${formatted}</span>`;
             }).join(' ');
 
             listDiv.innerHTML += `
                 <div class="ticket ${matchCount >= 2 ? 'match-win' : ''}">
-                    <div style="font-size:18px;">${numHTML}</div>
-                    <div style="font-size:10px; color:#666; margin-top:5px;">Matches: ${matchCount} | Total Won: $${t.payout}</div>
-                    <button class="log-win-btn" onclick="addWin(${i})">LOG WINNINGS</button>
-                    <span style="float:right; color:#444;" onclick="del(${i})">×</span>
+                    <span class="del-x" onclick="del(${i})">&times;</span>
+                    <div style="font-size:20px; font-weight:bold; letter-spacing:1px;">${numHTML}</div>
+                    <div style="font-size:11px; color:#666; margin-top:8px;">Matches: ${matchCount} | Individual Win: $${t.payout}</div>
+                    <button class="log-win-btn" onclick="addWin(${i})">LOG CASH WIN</button>
                 </div>`;
         });
 
@@ -96,22 +103,26 @@
     }
 
     function addWin(i) {
-        let win = prompt("How much did this ticket pay out?");
-        if(win) {
+        let win = prompt("How much did you cash this for?");
+        if(win && !isNaN(win)) {
             stats.won += parseInt(win);
             vault[i].payout += parseInt(win);
-            localStorage.setItem('f5_v21_vault', JSON.stringify(vault));
-            localStorage.setItem('f5_v21_stats', JSON.stringify(stats));
+            saveAll();
             render();
         }
     }
 
     function del(i) {
-        if(confirm("Remove ticket?")) {
+        if(confirm("Delete this ticket record?")) {
             vault.splice(i,1);
-            localStorage.setItem('f5_v21_vault', JSON.stringify(vault));
+            saveAll();
             render();
         }
+    }
+
+    function saveAll() {
+        localStorage.setItem('f5_v22_vault', JSON.stringify(vault));
+        localStorage.setItem('f5_v22_stats', JSON.stringify(stats));
     }
 
     window.onload = render;
