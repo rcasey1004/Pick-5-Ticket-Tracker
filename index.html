@@ -2,126 +2,116 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>F5 Multi-Day Tracker</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>F5 Tracker 2.1</title>
     <style>
-        :root { --neon: #00ffcc; --gold: #ffcc00; --faded: #333; }
-        body { font-family: sans-serif; background: #050505; color: white; padding: 15px; }
+        :root { --neon: #00ffcc; --gold: #ffcc00; --bg: #0a0a0a; }
+        body { font-family: sans-serif; background: var(--bg); color: white; padding: 15px; }
         .card { background: #111; padding: 20px; border-radius: 20px; border: 1px solid #222; max-width: 450px; margin: auto; }
-        .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px; }
-        .stat-box { background: #1a1a1a; padding: 10px; border-radius: 10px; text-align: center; border: 1px solid #333; }
-        
-        input, select { background: #1a1a1a; border: 1px solid #333; color: white; padding: 12px; border-radius: 10px; width: 100%; box-sizing: border-box; margin-bottom: 10px; font-size: 16px; }
-        button { background: var(--neon); color: black; border: none; padding: 15px; border-radius: 12px; font-weight: 800; width: 100%; cursor: pointer; }
-        
-        .ticket-item { background: #161616; padding: 15px; border-radius: 12px; margin-top: 10px; border-left: 5px solid var(--faded); position: relative; }
-        .active-ticket { border-left-color: var(--neon); }
-        .expired-ticket { opacity: 0.5; border-left-color: #ff4444; }
-        .days-left { position: absolute; right: 15px; top: 15px; font-size: 10px; background: #222; padding: 3px 7px; border-radius: 5px; color: var(--neon); }
+        .stats { display: flex; gap: 10px; margin-bottom: 20px; }
+        .stat-box { flex: 1; background: #1a1a1a; padding: 15px; border-radius: 15px; text-align: center; border: 1px solid #333; }
+        input, select { background: #1a1a1a; border: 1px solid #333; color: white; padding: 14px; border-radius: 12px; width: 100%; box-sizing: border-box; margin-bottom: 12px; font-size: 16px; }
+        button { background: var(--neon); color: black; border: none; padding: 16px; border-radius: 14px; font-weight: 800; width: 100%; cursor: pointer; }
+        .ticket { background: #161616; padding: 15px; border-radius: 12px; margin-top: 10px; border-left: 4px solid #333; position: relative; }
+        .match-win { border-left-color: var(--neon); background: #00221a; }
+        .match-num { color: var(--neon); font-weight: bold; text-decoration: underline; }
+        .log-win-btn { background: var(--gold); padding: 5px 10px; border-radius: 5px; font-size: 10px; border: none; font-weight: bold; margin-top: 8px; cursor: pointer; }
     </style>
 </head>
 <body>
 
 <div class="card">
-    <h2 style="color:var(--neon); margin-top:0;">VAULT 2.0</h2>
-    
-    <div class="stat-grid">
-        <div class="stat-box"><small>SPENT</small><br><strong id="totalSpend">$0</strong></div>
-        <div class="stat-box"><small>WON</small><br><strong id="totalWins" style="color:var(--gold)">$0</strong></div>
+    <div class="stats">
+        <div class="stat-box"><small>SPENT</small><br><span id="spentDisplay" style="font-size:20px; font-weight:900;">$0</span></div>
+        <div class="stat-box"><small>WON</small><br><span id="wonDisplay" style="font-size:20px; font-weight:900; color:var(--gold);">$0</span></div>
     </div>
 
-    <p style="font-size:11px; color:#666;">STEP 1: ENTER TONIGHT'S WINNERS</p>
-    <input type="text" id="winInput" placeholder="Ex: 12 16 21 29 39" oninput="checkWins()">
-
-    <p style="font-size:11px; color:#666;">STEP 2: LOG NEW PURCHASE</p>
-    <input type="text" id="ticketInput" placeholder="Enter Your Numbers">
+    <input type="text" id="winDraw" placeholder="Tonight's Winning #s" oninput="render()">
+    <input type="text" id="newTicket" placeholder="Enter Your Numbers">
     
-    <label style="font-size:11px; color:#666;">HOW MANY DAYS (1-10)?</label>
-    <select id="daysInput">
-        <option value="1">1 Day (Single Draw)</option>
-        <option value="2">2 Days</option>
+    <select id="duration">
+        <option value="1">1 Day</option>
         <option value="3">3 Days</option>
         <option value="5">5 Days</option>
-        <option value="10">10 Days (Full Run)</option>
+        <option value="10">10 Days</option>
     </select>
     
-    <button onclick="addTicket()">SAVE TO VAULT</button>
+    <button onclick="saveTicket()">SAVE TO PERSISTENT MEMORY</button>
 </div>
 
-<div id="vaultList" style="max-width:450px; margin: 20px auto;"></div>
+<div id="list" style="max-width:450px; margin: 20px auto;"></div>
 
 <script>
-    let tickets = JSON.parse(localStorage.getItem('f5_vault_v2') || "[]");
-    let stats = JSON.parse(localStorage.getItem('f5_stats') || '{"spent":0, "won":0}');
+    let vault = JSON.parse(localStorage.getItem('f5_v21_vault') || "[]");
+    let stats = JSON.parse(localStorage.getItem('f5_v21_stats') || '{"spent":0, "won":0}');
 
-    function addTicket() {
-        const nums = document.getElementById('ticketInput').value.trim();
-        const days = parseInt(document.getElementById('daysInput').value);
+    function saveTicket() {
+        const nums = document.getElementById('newTicket').value.trim();
+        const days = parseInt(document.getElementById('duration').value);
         if(!nums) return;
 
-        const newTicket = {
+        vault.push({
             nums: nums,
-            startDay: new Date().getTime(),
-            duration: days,
-            cost: days * 1, // Assumes $1 per day
-            wins: 0
-        };
+            added: new Date().getTime(),
+            days: days,
+            paid: days,
+            payout: 0
+        });
 
-        tickets.push(newTicket);
-        stats.spent += newTicket.cost;
-        saveData();
-        render();
-    }
-
-    function checkWins() {
+        stats.spent += days;
+        localStorage.setItem('f5_v21_vault', JSON.stringify(vault));
+        localStorage.setItem('f5_v21_stats', JSON.stringify(stats));
+        
+        document.getElementById('newTicket').value = ''; // Clear input!
         render();
     }
 
     function render() {
-        const winNums = document.getElementById('winInput').value.split(/\s+/).map(Number);
-        const list = document.getElementById('vaultList');
-        const now = new Date().getTime();
-        list.innerHTML = '';
+        const winning = document.getElementById('winDraw').value.split(/\s+/).map(Number);
+        const listDiv = document.getElementById('list');
+        listDiv.innerHTML = '';
 
-        tickets.forEach((t, i) => {
-            // Calculate if ticket is still active (86400000 ms per day)
-            const msPassed = now - t.startDay;
-            const daysPassed = Math.floor(msPassed / 86400000);
-            const daysRemaining = t.duration - daysPassed;
-            const isExpired = daysRemaining <= 0;
-
+        vault.forEach((t, i) => {
             const myNums = t.nums.split(/\s+/).map(Number);
-            let matches = myNums.filter(n => winNums.includes(n) && winNums[0] !== 0).length;
+            let matchCount = 0;
+            
+            // Build the number display with highlighting
+            let numHTML = myNums.map(n => {
+                const isMatch = winning.includes(n) && winning[0] !== 0;
+                if(isMatch) matchCount++;
+                return `<span class="${isMatch ? 'match-num' : ''}">${n < 10 ? '0'+n : n}</span>`;
+            }).join(' ');
 
-            list.innerHTML += `
-                <div class="ticket-item ${isExpired ? 'expired-ticket' : 'active-ticket'}">
-                    <span class="days-left">${isExpired ? 'EXPIRED' : daysRemaining + ' DAYS LEFT'}</span>
-                    <div style="font-size:18px; font-weight:bold; letter-spacing:1px;">${t.nums}</div>
-                    <div style="font-size:11px; color:#888; margin-top:5px;">
-                        Matches: <span style="color:var(--neon)">${matches}</span> | 
-                        Total Won: <span style="color:var(--gold)">$${t.wins}</span>
-                    </div>
-                    ${!isExpired ? `<button onclick="logWin(${i})" style="width:auto; padding:5px 10px; font-size:10px; margin-top:10px; background:var(--gold)">LOG PAYOUT</button>` : ''}
+            listDiv.innerHTML += `
+                <div class="ticket ${matchCount >= 2 ? 'match-win' : ''}">
+                    <div style="font-size:18px;">${numHTML}</div>
+                    <div style="font-size:10px; color:#666; margin-top:5px;">Matches: ${matchCount} | Total Won: $${t.payout}</div>
+                    <button class="log-win-btn" onclick="addWin(${i})">LOG WINNINGS</button>
+                    <span style="float:right; color:#444;" onclick="del(${i})">×</span>
                 </div>`;
         });
 
-        document.getElementById('totalSpend').innerText = `$${stats.spent}`;
-        document.getElementById('totalWins').innerText = `$${stats.won}`;
+        document.getElementById('spentDisplay').innerText = `$${stats.spent}`;
+        document.getElementById('wonDisplay').innerText = `$${stats.won}`;
     }
 
-    function logWin(i) {
-        let amt = prompt("Enter winnings for this ticket:");
-        if(amt) {
-            stats.won += parseInt(amt);
-            tickets[i].wins += parseInt(amt);
-            saveData();
+    function addWin(i) {
+        let win = prompt("How much did this ticket pay out?");
+        if(win) {
+            stats.won += parseInt(win);
+            vault[i].payout += parseInt(win);
+            localStorage.setItem('f5_v21_vault', JSON.stringify(vault));
+            localStorage.setItem('f5_v21_stats', JSON.stringify(stats));
             render();
         }
     }
 
-    function saveData() {
-        localStorage.setItem('f5_vault_v2', JSON.stringify(tickets));
-        localStorage.setItem('f5_stats', JSON.stringify(stats));
+    function del(i) {
+        if(confirm("Remove ticket?")) {
+            vault.splice(i,1);
+            localStorage.setItem('f5_v21_vault', JSON.stringify(vault));
+            render();
+        }
     }
 
     window.onload = render;
